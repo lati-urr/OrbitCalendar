@@ -32,19 +32,28 @@ class Fake { static void Main(string[] args){
 }
 function WaitFile($path){$end=[DateTime]::UtcNow.AddSeconds(10);while(-not(Test-Path -LiteralPath $path)){if([DateTime]::UtcNow -gt $end){throw ('File timeout '+$path)};Start-Sleep -Milliseconds 50}}
 # Validate release metadata before accepting a download location or executable.
-$asset=@{name='OrbitCalendar.exe';state='uploaded';size=2048;digest=('sha256:'+('a'*64));browser_download_url='https://github.com/NaitoMitsuharu/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'}
+$asset=@{name='OrbitCalendar.exe';state='uploaded';size=2048;digest=('sha256:'+('a'*64));browser_download_url='https://github.com/lati-urr/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'}
 $release=@{tag_name='v9.0.0';name='test';body='release notes';draft=$false;prerelease=$false;assets=@($asset)}
 $r=Call $updates 'Parse' @($json.Serialize($release));Assert ($r.IsNew -and $r.Version.ToString() -eq '9.0.0.0') 'New version comparison failed'
+Call $updates 'ValidateRelease' @($r)
+$asset.browser_download_url='https://github.com/NaitoMitsuharu/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'
+$legacy=Call $updates 'Parse' @($json.Serialize($release));Assert ($legacy.DownloadUrl -eq $asset.browser_download_url) 'Legacy repository asset rejected or rewritten'
+Call $updates 'ValidateRelease' @($legacy)
+foreach($url in @('https://github.com/other-owner/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe','https://github.com/lati-urr/other-repo/releases/download/v9.0.0/OrbitCalendar.exe','https://github.com/lati-urr/OrbitCalendar/releases/download/v8.0.0/OrbitCalendar.exe','https://github.com/lati-urr/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe?redirect=1')){
+ $asset.browser_download_url=$url;Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Unexpected release location accepted'
+ $legacy.DownloadUrl=$url;Reject {Call $updates 'ValidateRelease' @($legacy)} 'Unexpected installer download location accepted'
+}
+$asset.browser_download_url='https://github.com/lati-urr/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'
 $release.prerelease=$true;Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Prerelease accepted';$release.prerelease=$false
 $release.draft=$true;Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Draft accepted';$release.draft=$false
-$asset.browser_download_url='https://example.com/OrbitCalendar.exe';Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Untrusted download URL accepted';$asset.browser_download_url='https://github.com/NaitoMitsuharu/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'
+$asset.browser_download_url='https://example.com/OrbitCalendar.exe';Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Untrusted download URL accepted';$asset.browser_download_url='https://github.com/lati-urr/OrbitCalendar/releases/download/v9.0.0/OrbitCalendar.exe'
 $asset.digest=$null;Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Missing digest accepted';$asset.digest='sha256:'+('a'*64)
 $asset.size=1000000000;Reject {Call $updates 'Parse' @($json.Serialize($release))} 'Oversize asset accepted';$asset.size=2048
-$release.tag_name='v'+$a.GetName().Version.ToString(3);$asset.browser_download_url='https://github.com/NaitoMitsuharu/OrbitCalendar/releases/download/'+$release.tag_name+'/OrbitCalendar.exe';$r=Call $updates 'Parse' @($json.Serialize($release));Assert (-not $r.IsNew) 'Equal version offers reinstall'
+$release.tag_name='v'+$a.GetName().Version.ToString(3);$asset.browser_download_url='https://github.com/lati-urr/OrbitCalendar/releases/download/'+$release.tag_name+'/OrbitCalendar.exe';$r=Call $updates 'Parse' @($json.Serialize($release));Assert (-not $r.IsNew) 'Equal version offers reinstall'
 Reject {Call $updates 'Verify' @($exe,('a'*64),[version]'1.26.0.0')} 'Bad checksum accepted'
 Reject {Call $updates 'Verify' @($exe,(Hash $exe),[version]'2.0.0.0')} 'Wrong assembly version accepted'
 Assert (-not(Call $updates 'IsWorkDirectory' @($folder))) 'Unsafe cleanup directory accepted'
-Write-Output 'PASS: release metadata, stable versions, fixed repository URL, digest, size, equal version and executable verification'
+Write-Output 'PASS: new/legacy repository URLs, rejected unrelated release locations, stable versions, digest, size and executable verification'
 $startupBefore=Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name OrbitCalendar -ErrorAction SilentlyContinue
 foreach($scenario in @('success','launcher','rollback','bad-hash','wrong-parent','locked-target')){
  $targetDir=Join-Path $folder $scenario;$target=Fake $targetDir '1.25.0' $true
@@ -64,7 +73,7 @@ foreach($scenario in @('success','launcher','rollback','bad-hash','wrong-parent'
  $ready=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::ManualReset,$readyName)
  $path=Join-Path $work 'plan.json';[IO.File]::WriteAllText($path,($plan | ConvertTo-Json -Compress))
  if($scenario -eq 'launcher'){
-  $offer=[Activator]::CreateInstance($a.GetType('OrbitCalendar.AppUpdates+Release'));$offer.Tag='v1.26.0';$offer.Version=[version]'1.26.0.0';$offer.Sha256=Hash $staged;$offer.Size=(Get-Item -LiteralPath $staged).Length;$offer.DownloadUrl='https://github.com/NaitoMitsuharu/OrbitCalendar/releases/download/v1.26.0/OrbitCalendar.exe'
+  $offer=[Activator]::CreateInstance($a.GetType('OrbitCalendar.AppUpdates+Release'));$offer.Tag='v1.26.0';$offer.Version=[version]'1.26.0.0';$offer.Sha256=Hash $staged;$offer.Size=(Get-Item -LiteralPath $staged).Length;$offer.DownloadUrl='https://github.com/lati-urr/OrbitCalendar/releases/download/v1.26.0/OrbitCalendar.exe'
   $launch=Call $installer 'LaunchForProcess' @($staged,$offer,$target,$parent)
   $end=[DateTime]::UtcNow.AddSeconds(25);while(-not $launch.IsCompleted){if([DateTime]::UtcNow -gt $end){throw 'Launcher readiness timeout'};Start-Sleep -Milliseconds 50}
   Assert (-not $launch.IsFaulted -and -not $launch.IsCanceled) ('Launcher failed: '+$launch.Exception)

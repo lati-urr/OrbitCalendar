@@ -19,7 +19,7 @@ namespace OrbitCalendar
         CancellationTokenSource odptRequest;
         readonly Dictionary<string, DateTime> odptAttempts = new Dictionary<string, DateTime>();
         bool odptRefreshing;
-        const string OdptContact = "https://github.com/NaitoMitsuharu/OrbitCalendar/issues";
+        const string OdptContact = "https://github.com/lati-urr/OrbitCalendar/issues";
 
         void InitializeOdpt()
         {

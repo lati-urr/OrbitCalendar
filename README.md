@@ -3,7 +3,7 @@
 Windowsのタスクバーの日時をクリックすると開く、粒子でできたカレンダーです。
 カレンダーのほかに、株価・天気・ニュース・運行情報・ToDo・タイマーをまとめて見られます。
 
-[Windows版をダウンロード](https://github.com/NaitoMitsuharu/OrbitCalendar/releases/latest/download/OrbitCalendar.exe) · [リリース一覧](https://github.com/NaitoMitsuharu/OrbitCalendar/releases)
+[Windows版をダウンロード](https://github.com/lati-urr/OrbitCalendar/releases/latest/download/OrbitCalendar.exe) · [リリース一覧](https://github.com/lati-urr/OrbitCalendar/releases)
 
 ![粒子が動き、カレンダーを組み上げる様子](docs/assembly.gif)
 

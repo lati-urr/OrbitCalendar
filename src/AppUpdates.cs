@@ -15,7 +15,8 @@ namespace OrbitCalendar
 {
     internal static class AppUpdates
     {
-        public const string Repository = "https://github.com/NaitoMitsuharu/OrbitCalendar";
+        public const string Repository = "https://github.com/lati-urr/OrbitCalendar";
+        const string LegacyRepository = "https://github.com/NaitoMitsuharu/OrbitCalendar";
         const long MaximumSize = 100 * 1024 * 1024;
         static readonly HttpClient http = CreateClient();
         public static Version CurrentVersion { get { return Normalize(Assembly.GetExecutingAssembly().GetName().Version); } }
@@ -43,7 +44,7 @@ namespace OrbitCalendar
             using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(token))
             {
                 timeout.CancelAfter(TimeSpan.FromSeconds(20));
-                using (var response = await http.GetAsync("https://api.github.com/repos/NaitoMitsuharu/OrbitCalendar/releases/latest", timeout.Token).ConfigureAwait(false))
+                using (var response = await http.GetAsync("https://api.github.com/repos/lati-urr/OrbitCalendar/releases/latest", timeout.Token).ConfigureAwait(false))
                 {
                     response.EnsureSuccessStatusCode();
                     return Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
@@ -57,13 +58,17 @@ namespace OrbitCalendar
             Version version;
             if (!System.Version.TryParse(data.tag_name.TrimStart('v'), out version)) throw new InvalidDataException("バージョンを確認できませんでした");
             var asset = (data.assets ?? new Asset[0]).FirstOrDefault(a => a != null && a.name == "OrbitCalendar.exe" && a.state == "uploaded");
-            string expectedUrl = Repository + "/releases/download/" + data.tag_name + "/OrbitCalendar.exe";
-            if (asset == null || asset.size < 1024 || asset.size > MaximumSize || asset.browser_download_url != expectedUrl || asset.digest == null || !Regex.IsMatch(asset.digest, @"^sha256:[0-9a-fA-F]{64}$")) throw new InvalidDataException("更新ファイルの確認情報が不足しています");
-            return new Release { Tag = data.tag_name, Title = data.name ?? data.tag_name, Notes = data.body ?? "", Version = Normalize(version), DownloadUrl = expectedUrl, Size = asset.size, Sha256 = asset.digest.Substring(7).ToLowerInvariant() };
+            if (asset == null || asset.size < 1024 || asset.size > MaximumSize || !IsReleaseUrl(asset.browser_download_url, data.tag_name) || asset.digest == null || !Regex.IsMatch(asset.digest, @"^sha256:[0-9a-fA-F]{64}$")) throw new InvalidDataException("更新ファイルの確認情報が不足しています");
+            return new Release { Tag = data.tag_name, Title = data.name ?? data.tag_name, Notes = data.body ?? "", Version = Normalize(version), DownloadUrl = asset.browser_download_url, Size = asset.size, Sha256 = asset.digest.Substring(7).ToLowerInvariant() };
+        }
+        static bool IsReleaseUrl(string url, string tag)
+        {
+            string path = "/releases/download/" + tag + "/OrbitCalendar.exe";
+            return url == Repository + path || url == LegacyRepository + path;
         }
         internal static void ValidateRelease(Release release)
         {
-            if (release == null || release.Tag == null || !Regex.IsMatch(release.Tag, @"^v?\d+\.\d+\.\d+(\.\d+)?$") || release.DownloadUrl != Repository + "/releases/download/" + release.Tag + "/OrbitCalendar.exe" || release.Size < 1024 || release.Size > MaximumSize || release.Sha256 == null || !Regex.IsMatch(release.Sha256, @"^[0-9a-fA-F]{64}$")) throw new InvalidDataException("更新ファイルの取得元を確認できませんでした");
+            if (release == null || release.Tag == null || !Regex.IsMatch(release.Tag, @"^v?\d+\.\d+\.\d+(\.\d+)?$") || !IsReleaseUrl(release.DownloadUrl, release.Tag) || release.Size < 1024 || release.Size > MaximumSize || release.Sha256 == null || !Regex.IsMatch(release.Sha256, @"^[0-9a-fA-F]{64}$")) throw new InvalidDataException("更新ファイルの取得元を確認できませんでした");
             if (release.Version == null || Normalize(new Version(release.Tag.TrimStart('v'))) != Normalize(release.Version)) throw new InvalidDataException("更新バージョンの指定が一致しません");
         }
         public static async Task<string> Download(Release release, IProgress<double> progress, CancellationToken token)
